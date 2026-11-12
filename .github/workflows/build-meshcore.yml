@@ -7,6 +7,11 @@ on:
         description: "MeshCore branch, tag or commit to build"
         default: "main"
         required: true
+      melodies:
+        description: "T1000-E buzzer melodies (RTTTL), separated by |  e.g. startup:d=16,o=6,b=200:c,e,g,c7|ack:d=32,o=8,b=120:c  (empty = stock sounds)"
+        type: string
+        default: ""
+        required: false
       release:
         description: "Also publish a GitHub release with the firmware files"
         type: boolean
@@ -15,12 +20,8 @@ on:
 env:
   MESHCORE_REPO: meshcore-dev/MeshCore
   EXTRA_FLAGS: "-D MESH_PACKET_LOGGING=1"
-  # Custom T1000-E buzzer melodies in RTTTL format, one per line: name:d=..,o=..,b=..:notes
-  # The name must match an existing melody in the source (the build log lists them).
-  # Leave empty to keep the stock sounds. Example:
-  #   startup:d=16,o=6,b=200:c,e,g,c7
-  #   ack:d=32,o=8,b=120:c
-  MELODIES: |
+  # Custom T1000-E buzzer melodies from the "melodies" input (RTTTL, separated by |)
+  MELODIES: ${{ inputs.melodies }}
 
 jobs:
   build:
@@ -50,7 +51,7 @@ jobs:
           python3 - <<'PY'
           import os, re, sys
           wanted = {}
-          for line in os.environ["MELODIES"].splitlines():
+          for line in re.split(r"[|\n]", os.environ["MELODIES"]):
               line = line.strip()
               if not line or line.startswith("#"):
                   continue
@@ -137,7 +138,7 @@ jobs:
               echo "### Custom T1000-E buzzer melodies (RTTTL)"
               echo
               echo '```'
-              printf '%s\n' "$MELODIES" | grep -vE '^[[:space:]]*(#|$)' | sed 's/^[[:space:]]*//'
+              printf '%s\n' "$MELODIES" | tr '|' '\n' | grep -vE '^[[:space:]]*(#|$)' | sed 's/^[[:space:]]*//'
               echo '```'
             fi
           } > notes.md
