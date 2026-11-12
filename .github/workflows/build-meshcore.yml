@@ -15,6 +15,12 @@ on:
 env:
   MESHCORE_REPO: meshcore-dev/MeshCore
   EXTRA_FLAGS: "-D MESH_PACKET_LOGGING=1"
+  # Custom T1000-E buzzer melodies in RTTTL format, one per line: name:d=..,o=..,b=..:notes
+  # The name must match an existing melody in the source (the build log lists them).
+  # Leave empty to keep the stock sounds. Example:
+  #   startup:d=16,o=6,b=200:c,e,g,c7
+  #   ack:d=32,o=8,b=120:c
+  MELODIES: |
 
 jobs:
   build:
@@ -33,6 +39,41 @@ jobs:
         with:
           repository: ${{ env.MESHCORE_REPO }}
           ref: ${{ inputs.ref }}
+
+      - name: List existing buzzer melodies (RTTTL)
+        if: ${{ contains(matrix.env, 't1000e') }}
+        run: grep -rnoE '"[A-Za-z0-9_]+:d=[^"]*"' src examples variants || true
+
+      - name: Patch buzzer melodies
+        if: ${{ contains(matrix.env, 't1000e') && env.MELODIES != '' }}
+        run: |
+          python3 - <<'PY'
+          import os, re, sys
+          wanted = {}
+          for line in os.environ["MELODIES"].splitlines():
+              line = line.strip()
+              if not line or line.startswith("#"):
+                  continue
+              wanted[line.split(":", 1)[0]] = line
+          files = [os.path.join(r, f)
+                   for d in ("src", "examples", "variants")
+                   for r, _, fs in os.walk(d) for f in fs
+                   if f.endswith((".cpp", ".h", ".ino"))]
+          missing = set(wanted)
+          for path in files:
+              text = open(path, encoding="utf-8", errors="ignore").read()
+              new = text
+              for name, rtttl in wanted.items():
+                  pat = re.compile(r'"' + re.escape(name) + r':[^"]*"')
+                  if pat.search(new):
+                      new = pat.sub(lambda m: '"' + rtttl + '"', new)
+                      missing.discard(name)
+              if new != text:
+                  open(path, "w", encoding="utf-8").write(new)
+                  print("patched", path)
+          if missing:
+              sys.exit("No existing melody named: " + ", ".join(sorted(missing)))
+          PY
 
       - uses: actions/setup-python@v5
         with:
@@ -88,7 +129,19 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           tag="packetlog-$(date +%Y%m%d-%H%M)"
+          {
+            echo "Built from ${{ env.MESHCORE_REPO }} @ ${{ inputs.ref }} with \`${{ env.EXTRA_FLAGS }}\`."
+            # Only mention melodies if any were set (they apply to the t1000e builds only)
+            if [ -n "$(printf '%s' "$MELODIES" | tr -d '[:space:]')" ]; then
+              echo
+              echo "### Custom T1000-E buzzer melodies (RTTTL)"
+              echo
+              echo '```'
+              printf '%s\n' "$MELODIES" | grep -vE '^[[:space:]]*(#|$)' | sed 's/^[[:space:]]*//'
+              echo '```'
+            fi
+          } > notes.md
           gh release create "$tag" dist/* \
             --repo "${{ github.repository }}" \
             --title "MeshCore (${{ inputs.ref }}) + MESH_PACKET_LOGGING" \
-            --notes "Built from ${{ env.MESHCORE_REPO }} @ ${{ inputs.ref }} with \`${{ env.EXTRA_FLAGS }}\`."
+            --notes-file notes.md
