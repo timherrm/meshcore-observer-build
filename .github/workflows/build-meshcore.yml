@@ -41,11 +41,11 @@ jobs:
           repository: ${{ env.MESHCORE_REPO }}
           ref: ${{ inputs.ref }}
 
-      - name: Append -git to FIRMWARE_VERSION
+      - name: Append -timherrm to FIRMWARE_VERSION
         run: |
           files=$(grep -rlE '#define[[:space:]]+FIRMWARE_VERSION[[:space:]]+"' src examples variants || true)
           [ -n "$files" ] || { echo "No FIRMWARE_VERSION define found"; exit 1; }
-          sed -i -E '/#define[[:space:]]+FIRMWARE_VERSION[[:space:]]+"/{/-git"/!s/(FIRMWARE_VERSION[[:space:]]+"[^"]*)"/\1-git"/}' $files
+          sed -i -E '/#define[[:space:]]+FIRMWARE_VERSION[[:space:]]+"/{/-timherrm"/!s/(FIRMWARE_VERSION[[:space:]]+"[^"]*)"/\1-timherrm"/}' $files
           grep -rnE '#define[[:space:]]+FIRMWARE_VERSION' $files
 
       - name: List existing buzzer melodies (RTTTL)
