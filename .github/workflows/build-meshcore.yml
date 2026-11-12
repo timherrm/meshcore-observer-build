@@ -19,7 +19,7 @@ on:
 
 env:
   MESHCORE_REPO: meshcore-dev/MeshCore
-  EXTRA_FLAGS: "-D MESH_PACKET_LOGGING=1"
+  EXTRA_FLAGS: "-D MESH_PACKET_LOGGING=1 -D MESH_DEBUG=1"
   # Custom T1000-E buzzer melodies from the "melodies" input (RTTTL, separated by |)
   MELODIES: ${{ inputs.melodies }}
 
