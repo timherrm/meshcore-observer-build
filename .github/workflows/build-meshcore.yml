@@ -8,7 +8,7 @@ on:
         default: "main"
         required: true
       melodies:
-        description: "T1000-E buzzer melodies (RTTTL), separated by |  e.g. startup:d=16,o=6,b=200:c,e,g,c7|ack:d=32,o=8,b=120:c  (empty = stock sounds)"
+        description: "T1000-E buzzer melodies (RTTTL), separated by |  e.g. Startup:d=16,o=6,b=200:c,e,g,c7|ack:d=32,o=8,b=120:c  (names: Startup, Shutdown, MsgRcv3, kerplop, ack; empty = stock sounds)"
         type: string
         default: ""
         required: false
@@ -41,6 +41,13 @@ jobs:
           repository: ${{ env.MESHCORE_REPO }}
           ref: ${{ inputs.ref }}
 
+      - name: Append -git to FIRMWARE_VERSION
+        run: |
+          files=$(grep -rlE '#define[[:space:]]+FIRMWARE_VERSION[[:space:]]+"' src examples variants || true)
+          [ -n "$files" ] || { echo "No FIRMWARE_VERSION define found"; exit 1; }
+          sed -i -E '/#define[[:space:]]+FIRMWARE_VERSION[[:space:]]+"/{/-git"/!s/(FIRMWARE_VERSION[[:space:]]+"[^"]*)"/\1-git"/}' $files
+          grep -rnE '#define[[:space:]]+FIRMWARE_VERSION' $files
+
       - name: List existing buzzer melodies (RTTTL)
         if: ${{ contains(matrix.env, 't1000e') }}
         run: grep -rnoE '"[A-Za-z0-9_]+:d=[^"]*"' src examples variants || true
@@ -65,7 +72,7 @@ jobs:
               text = open(path, encoding="utf-8", errors="ignore").read()
               new = text
               for name, rtttl in wanted.items():
-                  pat = re.compile(r'"' + re.escape(name) + r':[^"]*"')
+                  pat = re.compile(r'"' + re.escape(name) + r':[^"]*"', re.IGNORECASE)
                   if pat.search(new):
                       new = pat.sub(lambda m: '"' + rtttl + '"', new)
                       missing.discard(name)
